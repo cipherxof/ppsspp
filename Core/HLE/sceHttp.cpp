@@ -714,44 +714,52 @@ static int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoPro
 
 // Parameter "method" should be one of PSPHttpMethod's listed entries
 static int sceHttpCreateRequestWithURL(int connectionID, int method, const char *url, u64 contentLength) {
-	WARN_LOG(Log::sceNet, "UNTESTED sceHttpCreateRequestWithURL(%d, %d, %s, %llx)", connectionID, method, safe_string(url), contentLength);
-	std::lock_guard<std::mutex> guard(httpLock);
-	if (connectionID <= 0 || connectionID > (int)httpObjects.size())
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
-
-	if (httpObjects[connectionID - 1LL]->className() != name_HTTPConnection)
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
-
-	if (method < PSPHttpMethod::PSP_HTTP_METHOD_GET || method > PSPHttpMethod::PSP_HTTP_METHOD_HEAD)
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_UNKNOWN_METHOD, "unknown method");
-
-	Url baseURL(url ? url : "");
-	if (!baseURL.Valid())
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_URL, "invalid url");
-
-	httpObjects.emplace_back(std::make_shared<HTTPRequest>(connectionID, method, url ? url : "", contentLength));
-	int retid = (int)httpObjects.size();
-	return hleLogDebug(Log::sceNet, retid);
+    WARN_LOG(Log::sceNet, "UNTESTED sceHttpCreateRequestWithURL(%d, %d, %s, %llx)", connectionID, method, safe_string(url), contentLength);
+    std::lock_guard<std::mutex> guard(httpLock);
+    if (connectionID <= 0 || connectionID > (int)httpObjects.size())
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
+    if (httpObjects[connectionID - 1LL]->className() != name_HTTPConnection)
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
+    if (method < PSPHttpMethod::PSP_HTTP_METHOD_GET || method > PSPHttpMethod::PSP_HTTP_METHOD_HEAD)
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_UNKNOWN_METHOD, "unknown method");
+    
+    // Convert URL to string and replace https with http
+    std::string modifiedUrl = url ? url : "";
+    if (modifiedUrl.find("https://") == 0) {
+        modifiedUrl.replace(0, 8, "http://");
+    }
+    
+    Url baseURL(modifiedUrl.c_str());
+    if (!baseURL.Valid())
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_URL, "invalid url");
+    
+    httpObjects.emplace_back(std::make_shared<HTTPRequest>(connectionID, method, modifiedUrl.c_str(), contentLength));
+    int retid = (int)httpObjects.size();
+    return hleLogDebug(Log::sceNet, retid);
 }
 
 static int sceHttpCreateConnectionWithURL(int templateID, const char *url, int enableKeepalive) {
-	WARN_LOG(Log::sceNet, "UNTESTED sceHttpCreateConnectionWithURL(%d, %s, %d)", templateID, safe_string(url), enableKeepalive);
-	std::lock_guard<std::mutex> guard(httpLock);
-	if (templateID <= 0 || templateID > (int)httpObjects.size())
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
-
-	if (httpObjects[templateID - 1LL]->className() != name_HTTPTemplate)
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
-
-	Url baseURL(url ? url: "");
-	if (!baseURL.Valid())
-		return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_URL, "invalid url");
-
-	// TODO: Here we should look up baseURL.Host() in DNS.
-
-	httpObjects.emplace_back(std::make_shared<HTTPConnection>(templateID, baseURL.Host().c_str(), baseURL.Protocol().c_str(), baseURL.Port(), enableKeepalive));
-	int retid = (int)httpObjects.size();
-	return hleLogDebug(Log::sceNet, retid);
+    WARN_LOG(Log::sceNet, "UNTESTED sceHttpCreateConnectionWithURL(%d, %s, %d)", templateID, safe_string(url), enableKeepalive);
+    std::lock_guard<std::mutex> guard(httpLock);
+    if (templateID <= 0 || templateID > (int)httpObjects.size())
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
+    if (httpObjects[templateID - 1LL]->className() != name_HTTPTemplate)
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_ID, "invalid id");
+    
+    // Convert URL to string and replace https with http
+    std::string modifiedUrl = url ? url : "";
+    if (modifiedUrl.find("https://") == 0) {
+        modifiedUrl.replace(0, 8, "http://");
+    }
+    
+    Url baseURL(modifiedUrl.c_str());
+    if (!baseURL.Valid())
+        return hleLogError(Log::sceNet, SCE_HTTP_ERROR_INVALID_URL, "invalid url");
+    
+    // TODO: Here we should look up baseURL.Host() in DNS.
+    httpObjects.emplace_back(std::make_shared<HTTPConnection>(templateID, baseURL.Host().c_str(), baseURL.Protocol().c_str(), baseURL.Port(), enableKeepalive));
+    int retid = (int)httpObjects.size();
+    return hleLogDebug(Log::sceNet, retid);
 }
 
 // id: ID of the template or connection
